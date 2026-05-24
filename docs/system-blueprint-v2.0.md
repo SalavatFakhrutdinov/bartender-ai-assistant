@@ -1,6 +1,6 @@
 # Technical Specification & Design Document
 ## Bartender AI Assistant — Full System Blueprint
-**Version:** 2.0 | **Date:** 2026-05-22 | **Status:** Draft for Review
+**Version:** 2.0 | **Date:** 2026-05-24 | **Status:** Draft — Decisions Integrated
 
 ---
 
@@ -21,7 +21,7 @@
 This document is the authoritative blueprint for two interconnected systems:
 
 1. **The Builder** — A self-organizing multi-agent AI development swarm (Analyst, Developer, QA/Tester, Project Manager, plus auxiliary agents) that builds and ships software via a feature-branch/TDD/CI-CD workflow, with all human-agent and agent-agent communication routed through an event-driven message bus and surfaced via Telegram.
-2. **The Product** — A web-based personal AI assistant for bartenders, with tiered subscriptions, a hybrid RAG-backed knowledge base combining vector search and structured knowledge graphs, a feedback-driven taste metric with an MLOps fine-tuning pipeline, and a physical realizability validation engine.
+2. **The Product** — A web-based personal AI assistant for bartenders, with tiered subscriptions (Track A: regular / Track B: business), a hybrid RAG-backed knowledge base combining vector search and structured knowledge graphs, a feedback-driven taste metric with an MLOps fine-tuning pipeline, a physical realizability validation engine, an end-user **Tech Support** module, a **Gamification** system to drive engagement and RAG data quality, and a **Topic Guardrail** to prevent general-purpose LLM abuse.
 
 **Key architectural upgrade over v1.0:** The agent system has been re-architected from four isolated Telegram bots into a **swarm-capable, event-driven agent mesh** with a central orchestrator, shared memory, skill registry, and self-healing capabilities. This enables parallel task execution, dynamic agent spawning, cross-agent learning, and resilient human-in-the-loop workflows.
 
@@ -396,6 +396,12 @@ Human/PM        Telegram GW       NATS Bus       Orchestrator      Analyst      
 └────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
+**Additional services (not shown in diagram for clarity):**
+- **Support Service** — End-user tech support chat widget → structured tickets surfaced to the internal Telegram group.
+- **Gamification Service** — Quest engine, point tracking, and reward redemption (automatic tier upgrades for quest completions).
+- **Topic Guardrail** — Lightweight pre-filter (rule-based heuristic + Llama Guard categories) sitting before the LLM Gateway to reject off-topic / general-purpose LLM abuse.
+- **Admin Curation Dashboard** — Internal Next.js view for reviewing, editing, and labeling scraped cocktails before ingestion into the KB.
+
 ---
 
 ## 1.2 Frontend Design
@@ -413,7 +419,7 @@ Human/PM        Telegram GW       NATS Bus       Orchestrator      Analyst      
 ### Main Screen Layout
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  [Logo] BartenderAI          [Plan: Free ▾]  [🔔] [Profile] [⚙️]            │
+│  [Logo] BartenderAI    [Plan: Free ▾] [🔔] [🎯 Quests] [Profile] [⚙️]       │
 ├───────────────────────────────────────┬─────────────────────────────────────┤
 │                                       │  QUICK GUIDE                        │
 │   Chat Window                         │  ─────────────────────────────────  │
@@ -435,7 +441,13 @@ Human/PM        Telegram GW       NATS Bus       Orchestrator      Analyst      
 │                                       │  ✨ Upgrade for premium models +    │
 │                                       │  bar context + menu upload          │
 └───────────────────────────────────────┴─────────────────────────────────────┘
+│  [💬 Support]                                                          │
 ```
+
+**New UI components:**
+- **🎯 Quests button** — Opens the Gamification Panel showing active quests, progress bars, and available rewards.
+- **💬 Support chat widget** — Bottom-right intercom-style bubble for end-user tech support inquiries.
+- **Admin Curation view** — Internal route (`/admin/curation`) for reviewing pending cocktails scraped during pre-launch data bootstrap.
 
 ### Slash Command System
 Commands are parsed client-side with a fuzzy-matching autocomplete engine:
@@ -447,6 +459,7 @@ Commands are parsed client-side with a fuzzy-matching autocomplete engine:
 - `/my-context` — (paid) View/edit bar concept, inventory, uploaded menus
 - `/feedback` — (all tiers) Submit taste survey for previously generated cocktails
 - `/compare [cocktail A] vs [cocktail B]` — (paid) Side-by-side ingredient and cost comparison
+- `/support [message]` — (all tiers) Open the support chat widget or send a tech support inquiry
 
 Command parsing: fuzzy match on `/` prefix → extract command + args → validate with Zod schema → set `messageType` + `payload` in Socket.io event.
 
@@ -457,12 +470,13 @@ Command parsing: fuzzy match on `/` prefix → extract command + args → valida
 ### Request Flow
 1. Client emits `chat:message` via Socket.io with `{ session_id, content, command?, user_id, request_id }`.
 2. Chat Service authenticates via Clerk JWT, loads user subscription tier from Redis cache (fallback to PostgreSQL).
-3. Calls **RAG Service** with query planning enabled (see 1.5).
-4. Constructs prompt: system prompt + RAG context + conversation history (last 10 turns, summarized beyond that).
-5. Calls **LLM Gateway v2** with the assembled prompt, streaming tokens back via Socket.io.
-6. Parses LLM output through JSON schema validator (Pydantic v2); if invalid, triggers regeneration with stricter prompt.
-7. Persists message + validated response to `messages` table; caches LLM response in Redis (TTL=1h for identical queries).
-8. If command is `/create-cocktail`, schedules deferred feedback survey (24h later via Celery beat).
+3. **Topic Guardrail** — Lightweight classifier checks if the query is bartending-relevant. Off-topic prompts (e.g., "write me a Python script", "explain quantum physics") are rejected with a safe fallback message and logged — no LLM call is made.
+4. Calls **RAG Service** with query planning enabled (see 1.5).
+5. Constructs prompt: system prompt + RAG context + conversation history (last 10 turns, summarized beyond that).
+6. Calls **LLM Gateway v2** with the assembled prompt, streaming tokens back via Socket.io.
+7. Parses LLM output through JSON schema validator (Pydantic v2); if invalid, triggers regeneration with stricter prompt.
+8. Persists message + validated response to `messages` table; caches LLM response in Redis (TTL=1h for identical queries).
+9. If command is `/create-cocktail`, schedules deferred feedback survey (24h later via Celery beat).
 
 ### System Prompt Template (Multi-Tier)
 ```
@@ -503,13 +517,24 @@ Conversation history (last 10 turns): {history_summary}
 
 The v2 gateway adds circuit breakers, cost tracking, A/B testing, and intelligent fallback chains.
 
+### Gateway Pipeline
+
+The LLM Gateway processes every request through a 3-stage pipeline:
+
+1. **Topic Guardrail** — Rule-based heuristic + Llama Guard category check. Off-topic queries are rejected before any provider is called.
+2. **Launch Promotion Override** — If `user.launch_promo_ends_at` is set and not expired, the gateway treats the user as `paid` for routing and feature-gate purposes.
+3. **Tier-based Model Routing** — Selects primary model, fallback chain, and rate limit based on effective tier.
+
 ### Routing Logic
 ```python
 class LLMGateway:
-    def route(self, user_tier: str, prompt: Prompt, complexity_score: float) -> LLMResponse:
+    def route(self, user_tier: str, prompt: Prompt, complexity_score: float, user: User) -> LLMResponse:
         # Complexity score (0-1) derived from prompt length, RAG context size, and command type
         
-        if user_tier == "free":
+        # Launch promotion override
+        effective_tier = user.effective_tier()  # "paid" if launch promo is active
+        
+        if effective_tier == "free":
             primary = ModelConfig("llama-3.3-70b-versatile", provider="groq", max_tokens=1024)
             fallback_chain = [
                 ModelConfig("llama-3.1-70b-versatile", provider="groq"),
@@ -518,7 +543,7 @@ class LLMGateway:
             ]
             rate_limit = RateLimit(rpm=10, rpd=100, window="sliding")
         
-        elif user_tier == "paid":
+        elif effective_tier == "paid":
             # A/B test: 50% Claude Sonnet, 50% GPT-4.1
             primary = self.ab_test_select("paid_generation", [
                 ModelConfig("claude-sonnet-4-6", provider="anthropic", max_tokens=4096),
@@ -533,7 +558,20 @@ class LLMGateway:
         return self.execute_with_fallback(primary, fallback_chain, prompt, rate_limit)
 ```
 
+**`effective_tier()` logic:**
+```python
+def effective_tier(user):
+    if user.launch_promo_ends_at and user.launch_promo_ends_at > now():
+        return "paid"
+    if user.tier in ("paid_monthly", "paid_annual", "team"):
+        return "paid"
+    return "free"
+```
+```
+
 ### Advanced Features
+- **Topic Guardrail:** First gate on every request. A lightweight classifier (rule-based heuristic + Llama Guard 3 category filtering) rejects off-topic prompts before any LLM provider is invoked. Logs all rejections for weekly review. False-positive rate target: <2%.
+- **Launch Promotion Mode:** New registrations during the 30-day launch window (or first N signups) receive `launch_promo_ends_at = NOW() + INTERVAL '30 days'`. While active, the user is routed to paid-tier models and features. After expiry, graceful degradation to standard free-tier limits.
 - **Circuit Breaker:** If a provider fails 5x in 2 minutes, traffic is routed away for 5 minutes.
 - **Cost Tracker:** Every LLM call logs tokens in/out, cost, latency, and model name to `llm_usage` table. Monthly cost alerts for paid tier operations.
 - **Prompt Cache:** Semantic cache in Redis — identical or near-identical prompts (cosine similarity >0.97) return cached response, saving ~30% of LLM calls.
@@ -636,9 +674,24 @@ Graph update: (BarConcept)-[:HAS_MENU_ITEM]->(ExtractedCocktail)
   - `paid_monthly` / `paid_annual` — premium LLMs (Claude/GPT-4); extended KB; bar context; menu upload; `/menu-design`; advanced RAG with query rewriting.
   - `team` (post-MVP) — shared bar context across bar staff, admin dashboard, analytics.
 
+### User Segmentation — Two Development Tracks
+- **Track A (Regular Users):** Individual bartenders and enthusiasts. Tier progression: `free` → `paid_monthly/annual`. Feature focus: cocktail creation, menu design, personal bar context, taste feedback.
+- **Track B (Business Users):** Bar chains, venue groups, and hospitality businesses. Tier: `team`. Feature focus: multi-user accounts, staff training mode, bulk menu analytics, centralized inventory, admin dashboard with usage reports.
+- The architecture supports both tracks from day one via Clerk orgs and role-based access, but Track B features are explicitly scoped to Phase 5 (post-MVP) to maintain focus.
+
+### Launch Promotion
+- During the first 30 days after launch (or for the first N signups), all new registrations receive a `launch_promo_ends_at` timestamp set to 30 days in the future.
+- While active, the user receives full paid-tier access: premium LLMs, extended KB, bar context, and all slash commands.
+- After expiry, the account gracefully degrades to the standard `free` tier with its usual rate limits (10 rpm / 100 rpd).
+- The promotion is a **time-boxed business rule**, not a permanent subscription state. It is evaluated by the LLM Gateway's `effective_tier()` logic before every request.
+
+### Feedback Incentive (Permanent)
+- Free users who submit 5 detailed feedback surveys unlock 14 days of paid-tier features.
+- This incentive is kept permanently because it directly feeds the MLOps fine-tuning pipeline and RAG quality improvement loop.
+
 ### Feature Gate Enforcement
 - Clerk JWT contains `tier` claim, refreshed on every session token rotation.
-- Backend middleware validates `tier` on every protected endpoint; rejects with `403` + upgrade CTA payload.
+- Backend middleware validates `effective_tier()` (tier + launch promo status) on every protected endpoint; rejects with `403` + upgrade CTA payload.
 - Frontend conditionally renders paid features; free users see blurred preview + one-click upgrade.
 - **Trial Mode:** New paid sign-ups get 7-day free trial with full feature access; no charge until trial ends.
 
@@ -686,10 +739,11 @@ All cocktail generation responses conform to this validated schema:
 ```
 
 **Safety Pipeline:**
-1. **Pre-generation:** Prompt scanned by Llama Guard 3 (free) or OpenAI Moderation + Llama Guard (paid). Blocked prompts return a safe fallback message and are logged.
-2. **Post-generation:** Response scanned for toxic content, profanity, and unsafe ingredient combinations (e.g., excessive alcohol concentration).
-3. **Physical Validation:** Recipe run through the validation engine (see Part 2.2). Failures trigger up to 2 regeneration attempts with error context injected.
-4. **Schema Validation:** Pydantic v2 strict validation. Schema failures trigger regeneration with the validation error as a constraint.
+1. **Topic Guardrail (Pre-filter):** Before any LLM call, a lightweight classifier checks if the prompt is bartending-relevant. Off-topic / general-purpose LLM abuse attempts are rejected immediately with a polite fallback ("I'm here to help with cocktails and bar operations!"). No tokens are consumed.
+2. **Pre-generation:** Prompt scanned by Llama Guard 3 (free) or OpenAI Moderation + Llama Guard (paid). Blocked prompts return a safe fallback message and are logged.
+3. **Post-generation:** Response scanned for toxic content, profanity, and unsafe ingredient combinations (e.g., excessive alcohol concentration).
+4. **Physical Validation:** Recipe run through the validation engine (see Part 2.2). Failures trigger up to 2 regeneration attempts with error context injected.
+5. **Schema Validation:** Pydantic v2 strict validation. Schema failures trigger regeneration with the validation error as a constraint.
 
 ---
 
@@ -751,7 +805,10 @@ taste_score = 0.30 * overall + 0.25 * balance + 0.20 * aroma + 0.15 * appearance
 - `taste_score ≥ 4.2` → cocktail eligible for ingestion into `extended_cocktails` KB (paid tier sees it immediately; free tier sees a "community pick" label).
 - `taste_score 3.5–4.1` → flagged for prompt refinement; used as neutral example.
 - `taste_score < 3.5` → marked `deprecated`; used as explicit negative example in future prompts.
-- **Free user incentive:** "Submit 5 detailed feedback surveys → unlock 14 days of paid features." Drives engagement and upgrade conversion.
+- **Free user incentive (Quest-based Gamification):** Users complete quests to earn paid-tier rewards.
+  - **Quest examples:** "Rate 3 cocktails", "Validate 2 recipes", "Tag 5 ingredients", "Submit your bar context".
+  - **Reward:** 7 days of paid subscription per completed quest milestone (capped at 21 days earned per month to prevent revenue cannibalization).
+  - **Impact:** Directly populates `taste_feedback_embeddings`, `validation_failures`, and `extended_cocktails` — improving RAG quality while driving engagement.
 
 **MLOps Fine-Tuning Pipeline (Monthly):**
 ```
@@ -933,6 +990,112 @@ LIMIT 5
 
 ---
 
+## 2.4 Tech Support Agent
+
+### Problem
+End users of the web app need technical support, billing help, and feature guidance. The internal multi-agent development swarm (Analyst/Developer/QA/PM) is designed for building the product — not for handling customer inquiries. Routing user support tickets into the dev agent's NATS `tickets.*` stream would pollute the development workflow.
+
+### Solution: Dedicated Support Service
+
+**Architecture:**
+- A standalone **Support Service** (FastAPI) with its own database tables and event stream.
+- Embedded **Support Chat Widget** in the web app (bottom-right, intercom-style bubble) accessible from all tiers.
+- Support inquiries are structured into tickets with: category, priority, user context (tier, session history), and body.
+- Tickets are surfaced to the internal Telegram group for human review by the core team.
+- Optional post-MVP: lightweight LLM auto-triage for FAQ responses ("How do I upload a menu?", "What's the difference between free and paid?").
+
+**Support Ticket Flow:**
+```
+User clicks 💬 Support
+    │
+    ▼
+Support Chat Widget (React)
+    │
+    ▼
+Support Service (FastAPI)
+  ├─ Structure ticket: category, priority, body, user context
+  ├─ Store in support_tickets table
+  ├─ Emit support.ticket_created to NATS (separate stream: support.*)
+    │
+    ▼
+Telegram Gateway → post to internal Telegram group
+    │
+    ▼
+Human team responds (or auto-triage LLM for FAQs)
+    │
+    ▼
+User receives reply in the chat widget + email notification
+```
+
+**Separation from Dev Swarm:**
+- Support events use the NATS `support.*` stream, completely isolated from `tickets.*` (dev swarm).
+- This prevents customer noise from interfering with agent-driven development.
+
+---
+
+## 2.5 Gamification Module
+
+### Problem
+User feedback submission rates are historically low (see Risk #5). Without sufficient labeled data, the MLOps fine-tuning pipeline and RAG quality improvements stall.
+
+### Solution: Quest-Based Gamification Engine
+
+**Gamification Service (FastAPI):**
+- Manages quest definitions, per-user progress tracking, and reward redemption.
+- Integrates with the Subscription Service to automatically upgrade/downgrade user tiers when rewards are earned or expire.
+
+**Quest Types:**
+| Quest | Description | Target Count | Reward |
+|-------|-------------|-------------|--------|
+| **First Feedback** | Submit your first cocktail taste survey | 1 | 3 days paid |
+| **Feedback Streak** | Submit 5 detailed feedback surveys | 5 | 7 days paid |
+| **Recipe Validator** | Validate 2 AI-generated recipes for physical plausibility | 2 | 7 days paid |
+| **Ingredient Tagger** | Tag 5 ingredients with flavor families | 5 | 3 days paid |
+| **Bar Context Setup** | Complete your bar concept and inventory | 1 | 7 days paid |
+| **Menu Designer** | Generate and save your first menu design | 1 | 7 days paid |
+
+**Economy Guardrails:**
+- Max 21 days of earned paid access per user per month (prevents revenue cannibalization).
+- Rewards stack with paid subscriptions (a paid user still earns "quest points" for leaderboard/reputation, but reward days are deferred).
+- Free users see a quest progress bar in the UI (`🎯 Quests` button) with clear "Earn X days of premium" CTAs.
+
+**Data Impact:**
+- Feedback quests → populate `cocktail_feedback` and `taste_feedback_embeddings`.
+- Validation quests → populate `validation_failures` with human labels.
+- Tagging quests → enrich the Knowledge Graph (Neo4j) with crowd-sourced flavor relationships.
+
+---
+
+## 2.6 Data Bootstrap — Scraper & Admin Curation
+
+### Problem
+At launch, the `extended_cocktails` collection (community KB for paid users) will be empty. Relying solely on user-generated content creates a cold-start problem where early paid users see no benefit from the extended KB.
+
+### Solution: Pre-Launch Scraper + Admin Curation Pipeline
+
+**Scraper Tool (Python / Scrapy or Playwright):**
+- Targets **public-domain and Creative Commons sources only**: vintage cocktail books (pre-1925), IBA official list, government recipe archives, CC-licensed mixology blogs.
+- **Explicitly excludes:** modern commercial recipe sites, copyrighted bar menus, and proprietary content.
+- Parses recipes into structured JSON: name, ingredients (with quantities), method, glass, garnish, source URL.
+- Stores raw scraped data in `pending_cocktails` table with `status = 'pending'`.
+
+**Admin Curation Dashboard (internal Next.js route `/admin/curation`):**
+- Review queue showing all `pending_cocktails`.
+- Admin can: edit ingredients, fix measurements, add tasting notes, assign `quality_rating` (1–5), assign `taste_score` (if the team has tasted it), and mark `approved_for_kb`.
+- Approved cocktails are upserted into:
+  - Qdrant `extended_cocktails` collection
+  - Neo4j graph (nodes + relationships)
+  - `cocktails` table with `source = 'curated'`
+- Rejected cocktails are marked `status = 'rejected'` and kept for audit.
+
+**Post-Launch Strategy:**
+- The scraper is **deprecated after launch** and disabled in production.
+- The system transitions to a user-generated + feedback-driven loop:
+  - AI generates cocktails → users make and rate them → high-rated entries enter `extended_cocktails`.
+- Admin curation UI remains active for reviewing user-submitted cocktails and managing quality.
+
+---
+
 ---
 
 # TECHNOLOGY STACK
@@ -1004,9 +1167,48 @@ LIMIT 5
 
 ---
 
+## Paid Tools Audit & Open-Source Alternatives
+
+| # | Paid SaaS Tool | Purpose | OSS / Self-Hosted Alternative | Trade-off |
+|---|----------------|---------|-------------------------------|-----------|
+| 1 | **Groq API** | Host Llama 3.3 70B for free tier | **Ollama** (self-hosted) | Requires GPU infra; slower TTFT |
+| 2 | **Anthropic API** | Claude Sonnet for paid tier | **Self-hosted Llama 3.3 70B / Mistral Large** | Quality gap vs. Claude; requires 80GB+ GPU |
+| 3 | **OpenAI API** | GPT-4.1, text-embedding-3-small, Moderation | **Local Llama 3.3 / all-MiniLM + Llama Guard 3** | Already listed as fallback; embedding quality slightly lower |
+| 4 | **Stripe** | Payment processing | *None (unavoidable)* | — |
+| 5 | **Clerk** | Auth (free tier covers 10k MAU) | **Keycloak** or **NextAuth.js** (v1.0 approach) | More integration work; no built-in MFA |
+| 6 | **GPT-4o Vision** | OCR for stylized menus | **Tesseract** + **layout-parser** (already fallback) | Lower accuracy on complex stylized menus |
+| 7 | **Fireworks AI / Together AI** | LoRA/QLoRA fine-tuning hosting | **Self-hosted with unsloth/axolotl** on RunPod/Vast.ai | Requires ML ops expertise |
+| 8 | **Sentry** | Error tracking | **Self-hosted Sentry** or **GlitchTip** | More infrastructure to maintain |
+| 9 | **Doppler** | Secrets management | **HashiCorp Vault** (v1.0 approach) or sealed secrets | More setup; no SaaS convenience |
+
+**Everything else in this design is already open-source / self-hostable:** Qdrant, Neo4j Community, NATS, Redis, PostgreSQL, MinIO, Traefik, Prometheus, Grafana, Loki, Celery, FastAPI, marker, MLflow, Llama Guard.
+
+### Recommendations for MVP
+1. **Keep Stripe** — Unavoidable for payment processing.
+2. **Keep Clerk** — Free tier covers early growth; migrating to Keycloak is a post-MVP optimization.
+3. **Pick ONE paid LLM provider** — Use either Anthropic (Claude) **or** OpenAI (GPT-4.1), not both. This cuts LLM costs by ~50%. Route paid traffic to the chosen provider; use the other's models only as a circuit-breaker fallback.
+4. **Replace Doppler with HashiCorp Vault** (or env files for absolute MVP minimalism) — Already listed in v1.0; no reason to add a new paid tool.
+5. **Use Ollama as the free-tier fallback** — Already in the design. Provides resilience if Groq rate-limits.
+6. **Defer fine-tuning hosting** — Don't subscribe to Fireworks/Together until you have 30+ days of feedback data. When ready, evaluate self-hosted (unsloth on rented GPU) vs. hosted cost.
+7. **Keep Sentry SaaS for MVP** — Self-hosted Sentry is heavy. Switch to GlitchTip or self-hosted only if error volume justifies it.
+
 ---
 
 # DATA MODELS
+
+## models
+```sql
+CREATE TABLE models (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name        VARCHAR(100) NOT NULL UNIQUE,        -- e.g. "claude-sonnet-4-6"
+    provider    VARCHAR(50) NOT NULL,                -- "anthropic" | "openai" | "groq" | "ollama"
+    tier        VARCHAR(20) NOT NULL DEFAULT 'free', -- "free" | "paid" | "fallback"
+    max_tokens  INTEGER,
+    is_active   BOOLEAN DEFAULT TRUE,
+    metadata    JSONB,                               -- cost per 1k tokens, latency stats
+    created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+```
 
 ## users
 ```sql
@@ -1017,6 +1219,7 @@ CREATE TABLE users (
     clerk_id    VARCHAR(255) UNIQUE NOT NULL,
     tier        VARCHAR(20) NOT NULL DEFAULT 'free',   -- 'free' | 'paid_monthly' | 'paid_annual' | 'team'
     trial_ends_at TIMESTAMPTZ,
+    launch_promo_ends_at TIMESTAMPTZ,                 -- 30-day launch promotion expiry
     preferences JSONB DEFAULT '{}',                     -- UI preferences, notification settings
     created_at  TIMESTAMPTZ DEFAULT NOW(),
     updated_at  TIMESTAMPTZ DEFAULT NOW()
@@ -1047,7 +1250,7 @@ CREATE TABLE chat_sessions (
     user_id     UUID REFERENCES users(id) ON DELETE CASCADE,
     title       VARCHAR(255) GENERATED ALWAYS AS (left(first_message, 50)) STORED,
     first_message TEXT,
-    model_used  VARCHAR(100),                          -- for analytics
+    model_used_id UUID REFERENCES models(id),          -- for analytics
     created_at  TIMESTAMPTZ DEFAULT NOW(),
     updated_at  TIMESTAMPTZ DEFAULT NOW()
 );
@@ -1062,7 +1265,7 @@ CREATE TABLE messages (
     content      TEXT NOT NULL,
     command      VARCHAR(50),
     command_args JSONB,
-    model_used   VARCHAR(100),
+    model_used_id UUID REFERENCES models(id),           -- normalized model reference
     latency_ms   INTEGER,
     token_count_input INTEGER,
     token_count_output INTEGER,
@@ -1081,7 +1284,7 @@ CREATE TABLE cocktails (
     glass           VARCHAR(100),
     garnish         VARCHAR(255),
     tasting_notes   JSONB,                              -- {aroma, palate, finish}
-    source          VARCHAR(50) NOT NULL,              -- 'iba' | 'generated' | 'user' | 'community'
+    source          VARCHAR(50) NOT NULL,              -- 'iba' | 'generated' | 'user' | 'community' | 'curated'
     created_by      UUID REFERENCES users(id),
     taste_score     DECIMAL(3,2),
     feedback_count  INTEGER DEFAULT 0,
@@ -1090,7 +1293,8 @@ CREATE TABLE cocktails (
     physical_validation_status VARCHAR(20),            -- 'passed' | 'failed' | 'warning'
     qdrant_point_id VARCHAR(255),                      -- Qdrant point ID
     neo4j_node_id   VARCHAR(255),                      -- Neo4j node ID
-    generation_metadata JSONB,                         -- {model, rag_sources, generation_time_ms}
+    model_used_id   UUID REFERENCES models(id),        -- which model generated this cocktail
+    generation_metadata JSONB,                         -- {rag_sources, generation_time_ms}
     created_at      TIMESTAMPTZ DEFAULT NOW(),
     updated_at      TIMESTAMPTZ DEFAULT NOW()
 );
@@ -1141,8 +1345,7 @@ CREATE TABLE llm_usage (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id       UUID REFERENCES users(id),
     session_id    UUID REFERENCES chat_sessions(id),
-    model         VARCHAR(100) NOT NULL,
-    provider      VARCHAR(50) NOT NULL,
+    model_used_id UUID REFERENCES models(id) NOT NULL, -- normalized model reference
     tokens_input  INTEGER NOT NULL,
     tokens_output INTEGER NOT NULL,
     cost_usd      DECIMAL(8,6),
@@ -1182,6 +1385,66 @@ CREATE TABLE ml_experiments (
 );
 ```
 
+## support_tickets
+```sql
+CREATE TABLE support_tickets (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id     UUID REFERENCES users(id) ON DELETE SET NULL,
+    category    VARCHAR(50) NOT NULL,  -- "billing" | "technical" | "feature_request" | "bug"
+    priority    VARCHAR(20) DEFAULT 'medium', -- "low" | "medium" | "high" | "urgent"
+    subject     VARCHAR(255),
+    body        TEXT NOT NULL,
+    status      VARCHAR(20) DEFAULT 'open', -- "open" | "in_progress" | "waiting" | "resolved" | "closed"
+    assigned_to UUID REFERENCES users(id),   -- admin user
+    resolution  TEXT,
+    created_at  TIMESTAMPTZ DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+## quests
+```sql
+CREATE TABLE quests (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name            VARCHAR(255) NOT NULL,
+    description     TEXT,
+    quest_type      VARCHAR(50) NOT NULL, -- "feedback" | "validation" | "tagging" | "onboarding"
+    target_count    INTEGER NOT NULL DEFAULT 1,
+    reward_days     INTEGER NOT NULL DEFAULT 7,
+    is_active       BOOLEAN DEFAULT TRUE,
+    created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+## user_quest_progress
+```sql
+CREATE TABLE user_quest_progress (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id     UUID REFERENCES users(id) ON DELETE CASCADE,
+    quest_id    UUID REFERENCES quests(id) ON DELETE CASCADE,
+    progress    INTEGER DEFAULT 0,
+    completed   BOOLEAN DEFAULT FALSE,
+    completed_at TIMESTAMPTZ,
+    UNIQUE(user_id, quest_id)
+);
+```
+
+## pending_cocktails
+```sql
+CREATE TABLE pending_cocktails (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    raw_data        JSONB NOT NULL,         -- scraped raw content
+    source_url      VARCHAR(500),
+    source_type     VARCHAR(50),            -- "scraper" | "manual" | "user_submission"
+    quality_rating  SMALLINT CHECK (quality_rating BETWEEN 1 AND 5),
+    taste_score     DECIMAL(3,2),
+    approved_by     UUID REFERENCES users(id),
+    approved_at     TIMESTAMPTZ,
+    status          VARCHAR(20) DEFAULT 'pending', -- "pending" | "approved" | "rejected"
+    created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
 ---
 
 ---
@@ -1205,6 +1468,8 @@ CREATE TABLE ml_experiments (
 - [ ] PM agent: basic release decision flow (approve/reject)
 - [ ] Agent Memory baseline: Qdrant collection for episodic memory
 - [ ] Health Monitor: heartbeat collection, auto-restart on failure
+- [ ] `models` table + seed data (Llama 3.3 70B, Claude Sonnet, GPT-4.1, Ollama local)
+- [ ] Topic Guardrail baseline: rule-based heuristic for off-topic rejection
 
 **Milestone:** Human PM sends feature request via Telegram → Analyst creates ticket → Developer implements stub → QA runs tests → PM approves mock release. Full swarm loop demonstrated.
 
@@ -1224,6 +1489,8 @@ CREATE TABLE ml_experiments (
 - [ ] Response streaming via Socket.io with typing indicators
 - [ ] Chat history persistence + session management
 - [ ] Developer + QA swarm agents operational on real tickets; CI gate enforced
+- [ ] Support chat widget + `support_tickets` table (basic create/list)
+- [ ] Admin curation dashboard skeleton (`/admin/curation` route, review queue UI)
 
 **Milestone:** Free user can chat, run `/create-cocktail`, receive a valid, safe cocktail suggestion using IBA context. Agent swarm has shipped at least 3 tickets end-to-end.
 
@@ -1244,6 +1511,9 @@ CREATE TABLE ml_experiments (
 - [ ] Extended cocktails collection (seed with 50 curated high-quality recipes)
 - [ ] `/menu-design` command (paid) with section grouping
 - [ ] PM agent: full release decision flow with risk assessment
+- [ ] Launch promotion flag in registration flow (`users.launch_promo_ends_at`)
+- [ ] Gamification module: `quests`, `user_quest_progress`, reward redemption API
+- [ ] Scraper tool (pre-launch data bootstrap): Scrapy/Playwright for public-domain cocktail sources
 
 **Milestone:** Paid user can upload their menu, describe their bar, and receive contextually relevant suggestions with menu fit scoring. Agent swarm has shipped paid-tier features autonomously.
 
@@ -1263,6 +1533,8 @@ CREATE TABLE ml_experiments (
 - [ ] MLOps pipeline: data prep → LoRA fine-tuning on Fireworks AI → MLflow tracking
 - [ ] A/B test framework for model variants (10% traffic to fine-tuned model)
 - [ ] Feedback text embeddings → `taste_feedback_embeddings` collection
+- [ ] Admin curation workflow: review → label → approve → ingest into Qdrant/Neo4j
+- [ ] Gamification rewards integration with Subscription Service (auto tier upgrades)
 
 **Milestone:** System rejects/repairs physically impossible recipes; high-rated cocktails enter the paid KB; first fine-tuned model trained and evaluated.
 
@@ -1282,6 +1554,8 @@ CREATE TABLE ml_experiments (
 - [ ] Security audit (OWASP Top 10 review, penetration testing)
 - [ ] Load testing with Locust/k6 (target: 100 concurrent users, p95 < 2s)
 - [ ] Documentation: API docs (auto-generated from FastAPI), runbooks, agent skill registry
+- [ ] Paid tools audit: evaluate self-hosted alternatives (Ollama, Vault) vs. SaaS costs
+- [ ] Topic Guardrail v2: evaluate fine-tuned DistilBERT if rule-based false-positive rate >2%
 
 **Milestone:** Production deployment to staging; UAT sign-off from 5+ real bartenders via Telegram; PM agent approves merge to `main`; system handles 100+ daily active users.
 
@@ -1297,6 +1571,8 @@ CREATE TABLE ml_experiments (
 - [ ] Kubernetes migration (Helm charts, HPA, ingress)
 - [ ] CDN + edge caching for static assets
 - [ ] Advanced analytics dashboard for bar managers (popularity trends, cost optimization)
+- [ ] Track B (Business/Team tier): multi-bar admin dashboard, staff training mode, bulk analytics
+- [ ] Advanced support auto-triage with lightweight LLM for FAQ responses
 
 ---
 
@@ -1319,6 +1595,10 @@ CREATE TABLE ml_experiments (
 | 11 | Fine-tuning pipeline produces degraded model | Medium | High | A/B test with 10% traffic; MLflow tracking; automatic rollback if taste_score drops; human bartender review gate before promotion. |
 | 12 | Neo4j complexity exceeds MVP bandwidth | Medium | Medium | Start with KùzuDB (embedded, simpler) for MVP. Migrate to Neo4j only if graph query complexity demands it. |
 | 13 | Socket.io scaling issues at 100+ concurrent users | Low | Medium | Redis adapter for Socket.io; horizontal scaling of Chat Service; connection limits per user. |
+| 14 | Scraper ingests copyrighted recipes | Medium | High | Strict whitelist: public-domain / CC sources only; admin curation gate before any data enters KB; legal review of sources. |
+| 15 | Gamification rewards cannibalize paid subscriptions | Medium | Medium | Cap reward at 7 days per quest; max 21 days earned per user per month; reward days deferred for already-paid users. |
+| 16 | Topic Guardrail false-positives reject valid bartending queries | Low | Medium | Start with permissive rule-based heuristic; log all rejections with user query; weekly human review; tune thresholds. |
+| 17 | Support ticket volume overwhelms small team | Medium | Medium | Auto-triage FAQ responses with lightweight LLM; escalate to human only for billing/technical issues; Telegram digest batching. |
 
 ---
 
