@@ -1,0 +1,15 @@
+log_level: INFO
+
+storage:
+  storage_path: /qdrant/storage
+  wal_capacity_mb: 32
+  max_concurrent_updates: 4
+
+service:
+  http_port: 6333
+  grpc_port: 6334
+  max_request_size_mb: 32
+  max_workers: 4
+
+cluster:
+  enabled: false

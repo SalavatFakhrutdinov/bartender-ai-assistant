@@ -1,0 +1,17 @@
+{
+  "name": "@bartender/shared-ts",
+  "version": "0.1.0",
+  "description": "Shared TypeScript types for Bartender AI Assistant",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.4",
+    "@types/node": "^20",
+    "eslint": "^8"
+  }
+}

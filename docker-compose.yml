@@ -1,0 +1,302 @@
+version: "3.9"
+
+services:
+  # ===========================================================================
+  # Reverse Proxy
+  # ===========================================================================
+  traefik:
+    image: traefik:v3.0
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--accesslog=true"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"  # Traefik dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - bartender-network
+
+  # ===========================================================================
+  # PostgreSQL + pgvector
+  # ===========================================================================
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-bartender_ai}
+      POSTGRES_USER: ${POSTGRES_USER:-bartender}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bartender} -d ${POSTGRES_DB:-bartender_ai}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bartender-network
+
+  # ===========================================================================
+  # Redis
+  # ===========================================================================
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bartender-network
+
+  # ===========================================================================
+  # Qdrant (Vector Database)
+  # ===========================================================================
+  qdrant:
+    image: qdrant/qdrant:latest
+    volumes:
+      - qdrant_data:/qdrant/storage
+      - ./infra/qdrant/config.yaml:/qdrant/config/production.yaml
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bartender-network
+
+  # ===========================================================================
+  # NATS JetStream
+  # ===========================================================================
+  nats:
+    image: nats:2-alpine
+    command: >
+      --js
+      --store_dir /data/jetstream
+      --config /etc/nats/nats-server.conf
+    volumes:
+      - nats_data:/data/jetstream
+      - ./infra/nats/nats-server.conf:/etc/nats/nats-server.conf
+    ports:
+      - "4222:4222"
+      - "8222:8222"  # NATS monitoring
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8222/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bartender-network
+
+  # ===========================================================================
+  # MinIO (S3-compatible object storage)
+  # ===========================================================================
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bartender-network
+
+  # ===========================================================================
+  # API Service (FastAPI)
+  # ===========================================================================
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      - ENV=${ENV:-development}
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - QDRANT_URL=${QDRANT_URL}
+      - NATS_URL=${NATS_URL}
+      - CLERK_SECRET_KEY=${CLERK_SECRET_KEY}
+      - CLERK_JWKS_URL=${CLERK_JWKS_URL}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - RATE_LIMIT_FREE_RPM=${RATE_LIMIT_FREE_RPM:-10}
+      - RATE_LIMIT_FREE_RPD=${RATE_LIMIT_FREE_RPD:-100}
+      - RATE_LIMIT_PAID_RPM=${RATE_LIMIT_PAID_RPM:-60}
+      - RATE_LIMIT_PAID_RPD=${RATE_LIMIT_PAID_RPD:-1000}
+    ports:
+      - "8000:8000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.rule=Host(`api.localhost`)"
+      - "traefik.http.routers.api.entrypoints=web"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    networks:
+      - bartender-network
+
+  # ===========================================================================
+  # Frontend (Next.js)
+  # ===========================================================================
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+      - CLERK_SECRET_KEY=${CLERK_SECRET_KEY}
+    ports:
+      - "3000:3000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.web.rule=Host(`localhost`)"
+      - "traefik.http.routers.web.entrypoints=web"
+    depends_on:
+      - api
+    networks:
+      - bartender-network
+
+  # ===========================================================================
+  # Agent Swarm Orchestrator
+  # ===========================================================================
+  orchestrator:
+    build:
+      context: .
+      dockerfile: agents/orchestrator/Dockerfile
+    environment:
+      - NATS_URL=${NATS_URL}
+      - REDIS_URL=${REDIS_URL}
+      - AGENT_HEARTBEAT_INTERVAL_SECONDS=${AGENT_HEARTBEAT_INTERVAL_SECONDS:-30}
+      - AGENT_HEARTBEAT_TIMEOUT_SECONDS=${AGENT_HEARTBEAT_TIMEOUT_SECONDS:-90}
+    ports:
+      - "8001:8000"
+    depends_on:
+      nats:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - bartender-network
+
+  # ===========================================================================
+  # Telegram Gateway
+  # ===========================================================================
+  telegram-gateway:
+    build:
+      context: .
+      dockerfile: agents/telegram-gateway/Dockerfile
+    environment:
+      - NATS_URL=${NATS_URL}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+    depends_on:
+      nats:
+        condition: service_healthy
+    networks:
+      - bartender-network
+
+  # ===========================================================================
+  # Core Agents
+  # ===========================================================================
+  analyst:
+    build:
+      context: .
+      dockerfile: agents/analyst/Dockerfile
+    environment:
+      - NATS_URL=${NATS_URL}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - AGENT_ID=analyst-1
+      - AGENT_TYPE=Analyst
+    depends_on:
+      - orchestrator
+      - nats
+    networks:
+      - bartender-network
+
+  developer:
+    build:
+      context: .
+      dockerfile: agents/developer/Dockerfile
+    environment:
+      - NATS_URL=${NATS_URL}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - AGENT_ID=developer-1
+      - AGENT_TYPE=Developer
+    depends_on:
+      - orchestrator
+      - nats
+    networks:
+      - bartender-network
+
+  qa:
+    build:
+      context: .
+      dockerfile: agents/qa/Dockerfile
+    environment:
+      - NATS_URL=${NATS_URL}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - AGENT_ID=qa-1
+      - AGENT_TYPE=QA
+    depends_on:
+      - orchestrator
+      - nats
+    networks:
+      - bartender-network
+
+  pm:
+    build:
+      context: .
+      dockerfile: agents/pm/Dockerfile
+    environment:
+      - NATS_URL=${NATS_URL}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - AGENT_ID=pm-1
+      - AGENT_TYPE=PM
+    depends_on:
+      - orchestrator
+      - nats
+    networks:
+      - bartender-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  qdrant_data:
+  nats_data:
+  minio_data:
+
+networks:
+  bartender-network:
+    driver: bridge

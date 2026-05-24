@@ -1,0 +1,5 @@
+"""Pydantic-Settings based configuration loader."""
+
+from shared.config.settings import Settings, get_settings
+
+__all__ = ["Settings", "get_settings"]

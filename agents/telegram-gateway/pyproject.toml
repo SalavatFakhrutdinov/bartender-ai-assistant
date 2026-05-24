@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "telegram-gateway"
+version = "0.1.0"
+description = "Telegram ↔ NATS bidirectional gateway"
+authors = ["Bartender AI Team"]
+readme = "README.md"
+packages = [{ include = "src" }]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+shared = { path = "../../packages/shared-py", develop = true }
+python-telegram-bot = { version = "^21.0", extras = ["job-queue"] }
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.2"
+pytest-asyncio = "^0.23"
+ruff = "^0.4"
+mypy = "^1.10"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

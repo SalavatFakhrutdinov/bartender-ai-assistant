@@ -1,0 +1,115 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  python-lint-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 1.8.3
+
+      - name: Install shared package
+        run: |
+          cd packages/shared-py
+          poetry install
+
+      - name: Lint shared package
+        run: |
+          cd packages/shared-py
+          poetry run ruff check .
+          poetry run ruff format --check .
+          poetry run mypy .
+
+      - name: Test shared package
+        run: |
+          cd packages/shared-py
+          poetry run pytest --cov=shared --cov-report=xml
+
+      - name: Install API service
+        run: |
+          cd apps/api
+          poetry install
+
+      - name: Lint API service
+        run: |
+          cd apps/api
+          poetry run ruff check .
+          poetry run ruff format --check .
+          poetry run mypy .
+
+  node-lint-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: |
+          cd apps/web
+          pnpm install
+
+      - name: Type check
+        run: |
+          cd apps/web
+          pnpm typecheck
+
+      - name: Lint
+        run: |
+          cd apps/web
+          pnpm lint
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install bandit
+        run: pip install bandit
+
+      - name: Run bandit
+        run: bandit -r packages/shared-py/shared apps/api/src agents/ -f json -o bandit-report.json || true
+
+      - name: Upload bandit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: bandit-report.json
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build API image
+        run: docker build -f apps/api/Dockerfile -t bartender-api:test .
+
+      - name: Build Web image
+        run: docker build -f apps/web/Dockerfile -t bartender-web:test .

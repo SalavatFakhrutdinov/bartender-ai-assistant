@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "developer-agent"
+version = "0.1.0"
+description = "Developer agent — TDD implementation, code generation, git ops"
+authors = ["Bartender AI Team"]
+packages = [{ include = "src" }]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+shared = { path = "../../packages/shared-py", develop = true }
+agent-base = { path = "../_base", develop = true }
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.2"
+pytest-asyncio = "^0.23"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
