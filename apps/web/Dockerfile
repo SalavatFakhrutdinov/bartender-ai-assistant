@@ -12,7 +12,7 @@ RUN cd /app/packages/shared-ts && pnpm install && pnpm build
 # Copy web app
 COPY apps/web/package.json apps/web/pnpm-lock.yaml* /app/apps/web/
 WORKDIR /app/apps/web
-RUN pnpm install --frozen-lockfile
+RUN pnpm install
 
 COPY apps/web /app/apps/web
 RUN pnpm build

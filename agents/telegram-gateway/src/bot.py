@@ -14,8 +14,8 @@ from telegram.ext import (
 from shared.logging import get_logger
 from shared.nats_client import NatsClient
 from shared.config import get_settings
-from agents.telegram-gateway.src.normalizer import Normalizer
-from agents.telegram-gateway.src.surfacer import Surfacer
+from src.normalizer import Normalizer
+from src.surfacer import Surfacer
 
 logger = get_logger(__name__)
 

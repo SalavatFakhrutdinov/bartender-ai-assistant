@@ -11,7 +11,7 @@ from shared.logging import get_logger
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from apps.api.src.core.config import get_api_settings
+from src.core.config import get_api_settings
 
 logger = get_logger(__name__)
 security = HTTPBearer(auto_error=False)

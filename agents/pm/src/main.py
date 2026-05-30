@@ -3,7 +3,7 @@
 import asyncio
 
 from shared.logging import configure_logging
-from agents.pm.src.pm import PMAgent
+from src.pm import PMAgent
 
 
 async def main() -> None:

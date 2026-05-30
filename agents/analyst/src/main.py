@@ -3,7 +3,7 @@
 import asyncio
 
 from shared.logging import configure_logging
-from agents.analyst.src.analyst import AnalystAgent
+from src.analyst import AnalystAgent
 
 
 async def main() -> None:

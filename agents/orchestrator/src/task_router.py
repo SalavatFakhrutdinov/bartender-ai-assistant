@@ -4,7 +4,7 @@ from typing import Any
 
 from shared.events.schemas import Event, AgentTaskAssigned
 from shared.logging import get_logger
-from agents.orchestrator.src.skill_registry import SkillRegistry, AgentManifest
+from src.skill_registry import SkillRegistry, AgentManifest
 
 logger = get_logger(__name__)
 

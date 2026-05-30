@@ -6,12 +6,12 @@ from shared.logging import configure_logging, get_logger
 from shared.config import get_settings
 from shared.models.base import configure_async_session
 
-from apps.api.src.core.config import get_api_settings
-from apps.api.src.core.lifespan import lifespan
-from apps.api.src.middleware.cors import add_cors_middleware
-from apps.api.src.middleware.auth import ClerkAuthMiddleware
-from apps.api.src.middleware.rate_limit import RateLimitMiddleware
-from apps.api.src.routers import health, auth
+from src.core.config import get_api_settings
+from src.core.lifespan import lifespan
+from src.middleware.cors import add_cors_middleware
+from src.middleware.auth import ClerkAuthMiddleware
+from src.middleware.rate_limit import RateLimitMiddleware
+from src.routers import health, auth
 
 logger = get_logger(__name__)
 

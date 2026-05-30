@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from shared.logging import get_logger
-from agents.orchestrator.src.skill_registry import SkillRegistry
+from src.skill_registry import SkillRegistry
 
 logger = get_logger(__name__)
 

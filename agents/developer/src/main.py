@@ -3,7 +3,7 @@
 import asyncio
 
 from shared.logging import configure_logging
-from agents.developer.src.developer import DeveloperAgent
+from src.developer import DeveloperAgent
 
 
 async def main() -> None:

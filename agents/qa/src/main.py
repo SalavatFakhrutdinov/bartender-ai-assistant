@@ -3,7 +3,7 @@
 import asyncio
 
 from shared.logging import configure_logging
-from agents.qa.src.qa import QAAgent
+from src.qa import QAAgent
 
 
 async def main() -> None:

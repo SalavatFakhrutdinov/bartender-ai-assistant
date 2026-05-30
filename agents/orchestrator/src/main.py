@@ -24,10 +24,10 @@ from shared.events.subjects import (
 )
 from shared.health import health_endpoint
 
-from agents.orchestrator.src.skill_registry import SkillRegistry, AgentManifest
-from agents.orchestrator.src.task_router import TaskRouter
-from agents.orchestrator.src.correlator import EventCorrelator
-from agents.orchestrator.src.health_monitor import HealthMonitor
+from src.skill_registry import SkillRegistry, AgentManifest
+from src.task_router import TaskRouter
+from src.correlator import EventCorrelator
+from src.health_monitor import HealthMonitor
 
 logger = get_logger(__name__)
 
