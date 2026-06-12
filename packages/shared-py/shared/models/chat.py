@@ -53,4 +53,6 @@ class Message(Base, UUIDMixin, TimestampMixin):
     token_count_input: Mapped[int | None] = mapped_column(Integer)
     token_count_output: Mapped[int | None] = mapped_column(Integer)
 
-    session: Mapped["ChatSession"] = relationship("ChatSession", back_populates="messages")
+    session: Mapped["ChatSession"] = relationship(
+        "ChatSession", back_populates="messages"
+    )

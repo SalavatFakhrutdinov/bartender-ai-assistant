@@ -14,6 +14,7 @@ sqlalchemy = { version = "^2.0", extras = ["asyncio"] }
 asyncpg = "^0.29"
 alembic = "^1.13"
 qdrant-client = "^1.9"
+pgvector = "^0.2"
 redis = "^5.0"
 nats-py = "^2.7"
 structlog = "^24.1"
@@ -44,6 +45,10 @@ disable_error_code = ["attr-defined", "misc", "assignment"]
 [[tool.mypy.overrides]]
 module = "shared.nats_client.*"
 disable_error_code = ["attr-defined"]
+
+[[tool.mypy.overrides]]
+module = "pgvector.*"
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -2,8 +2,16 @@
 
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, ForeignKey, Integer, String, Text
-from sqlalchemy.dialects.postgresql import DECIMAL, JSONB, TIMESTAMPTZ
+from sqlalchemy import (
+    DECIMAL,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+)
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from shared.models.base import Base, TimestampMixin, UUIDMixin
@@ -24,7 +32,7 @@ class Model(Base, UUIDMixin, TimestampMixin):
     )
     max_tokens: Mapped[int | None] = mapped_column(Integer)
     is_active: Mapped[bool] = mapped_column(default=True)
-    metadata: Mapped[dict | None] = mapped_column(JSONB)
+    config: Mapped[dict | None] = mapped_column("metadata", JSONB)
 
 
 class LLMUsage(Base, UUIDMixin, TimestampMixin):
@@ -77,5 +85,5 @@ class PendingCocktail(Base, UUIDMixin, TimestampMixin):
     )
     taste_score: Mapped[float | None] = mapped_column(DECIMAL(3, 2))
     approved_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
-    approved_at: Mapped[datetime | None] = mapped_column(TIMESTAMPTZ)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     status: Mapped[str] = mapped_column(String(20), default="pending")

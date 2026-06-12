@@ -3,8 +3,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, Integer, String, UniqueConstraint
-from sqlalchemy.dialects.postgresql import TIMESTAMPTZ
+from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from shared.models.base import Base, TimestampMixin, UUIDMixin
@@ -45,7 +44,7 @@ class UserQuestProgress(Base, UUIDMixin, TimestampMixin):
     )
     progress: Mapped[int] = mapped_column(Integer, default=0)
     completed: Mapped[bool] = mapped_column(default=False)
-    completed_at: Mapped[datetime | None] = mapped_column(TIMESTAMPTZ)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     quest: Mapped["Quest"] = relationship("Quest", back_populates="progress")
     user: Mapped["User"] = relationship("User", back_populates="quest_progress")

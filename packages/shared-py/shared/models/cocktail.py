@@ -2,8 +2,9 @@
 
 from typing import TYPE_CHECKING
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import DECIMAL, CheckConstraint, ForeignKey, Integer, String, Text
-from sqlalchemy.dialects.postgresql import JSONB, VECTOR
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from shared.models.base import Base, TimestampMixin, UUIDMixin
@@ -71,6 +72,6 @@ class CocktailFeedback(Base, UUIDMixin, TimestampMixin):
     would_repeat: Mapped[str | None] = mapped_column(String(20))
     modification_note: Mapped[str | None] = mapped_column(Text)
     notes: Mapped[str | None] = mapped_column(Text)
-    embedding: Mapped[list[float] | None] = mapped_column(VECTOR(1536))
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(1536))
 
     cocktail: Mapped["Cocktail"] = relationship("Cocktail", back_populates="feedback")

@@ -18,7 +18,9 @@ class EventMeta(BaseModel):
     event_id: str = Field(default_factory=lambda: str(uuid4()))
     correlation_id: str = Field(default_factory=lambda: str(uuid4()))
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    source: str = Field(default="unknown", description="Service or agent that emitted the event")
+    source: str = Field(
+        default="unknown", description="Service or agent that emitted the event"
+    )
     version: str = Field(default="1.0", description="Schema version")
 
 
@@ -241,7 +243,9 @@ class AgentHeartbeat(Event):
     skills: list[dict[str, Any]] = Field(default_factory=list)
     current_load: int = 0
     max_concurrent: int = 1
-    status: str = Field(default="healthy", pattern="^(healthy|busy|degraded|unhealthy)$")
+    status: str = Field(
+        default="healthy", pattern="^(healthy|busy|degraded|unhealthy)$"
+    )
     version: str = "0.1.0"
 
 

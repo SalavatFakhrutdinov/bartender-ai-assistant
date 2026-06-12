@@ -61,7 +61,9 @@ class NatsClient:
             except nats.js.errors.StreamNameAlreadyInUseError:  # type: ignore[attr-defined]
                 logger.debug("Stream already exists", stream=stream.name)
             except Exception as e:
-                logger.error("Failed to create stream", stream=stream.name, error=str(e))
+                logger.error(
+                    "Failed to create stream", stream=stream.name, error=str(e)
+                )
                 raise
 
     async def publish(self, event: Event) -> None:
