@@ -29,9 +29,7 @@ class User(Base, UUIDMixin, TimestampMixin):
         server_default="free",
     )
     trial_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    launch_promo_ends_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True)
-    )
+    launch_promo_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     preferences: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
 
     # Relationships
@@ -67,9 +65,7 @@ class Subscription(Base, UUIDMixin, TimestampMixin):
     stripe_customer_id: Mapped[str | None] = mapped_column(String(255))
     plan: Mapped[str] = mapped_column(String(50), nullable=False)
     status: Mapped[str] = mapped_column(String(50), nullable=False)
-    current_period_start: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True)
-    )
+    current_period_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     current_period_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     cancel_at_period_end: Mapped[bool] = mapped_column(default=False)
 

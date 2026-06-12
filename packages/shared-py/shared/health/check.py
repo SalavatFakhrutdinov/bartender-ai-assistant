@@ -40,9 +40,7 @@ async def health_endpoint(
     any_degraded = any(
         v != "ok" and v != "connected" and v is not True for v in all_checks.values()
     )
-    any_unhealthy = any(
-        v in ("failed", "unhealthy", "error", False) for v in all_checks.values()
-    )
+    any_unhealthy = any(v in ("failed", "unhealthy", "error", False) for v in all_checks.values())
 
     status = "ok"
     if any_degraded:
