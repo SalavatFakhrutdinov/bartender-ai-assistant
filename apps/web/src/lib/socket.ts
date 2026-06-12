@@ -1,7 +1,7 @@
-"""Socket.io client setup for real-time chat.
-
-Stub for Phase 0 — full Socket.io integration in Phase 1.
-"""
+/* Socket.io client setup for real-time chat.
+ *
+ * Stub for Phase 0 — full Socket.io integration in Phase 1.
+ */
 
 import { io, Socket } from "socket.io-client";
 

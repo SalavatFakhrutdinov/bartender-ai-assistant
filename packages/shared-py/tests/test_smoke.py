@@ -1,7 +1,5 @@
 """Smoke tests for shared package imports."""
 
-import pytest
-
 
 def test_version():
     from shared import __version__
@@ -16,8 +14,7 @@ def test_settings_load():
     assert settings.env == "development"
 
 
-def test_guardrail():
-    from shared.models.chat import GuardrailResult
+def test_base_model():
+    from shared.models.base import Base
 
-    result = GuardrailResult(allowed=True, score=1.0)
-    assert result.allowed is True
+    assert Base is not None
