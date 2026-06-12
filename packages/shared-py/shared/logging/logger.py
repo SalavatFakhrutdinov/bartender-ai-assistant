@@ -66,4 +66,4 @@ def get_logger(name: str) -> structlog.stdlib.BoundLogger:
         logger = get_logger(__name__)
         logger.info("event_occurred", key="value")
     """
-    return structlog.get_logger(name)
+    return structlog.get_logger(name)  # type: ignore[no-any-return]

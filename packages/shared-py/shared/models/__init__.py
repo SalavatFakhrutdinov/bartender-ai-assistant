@@ -5,13 +5,13 @@ service, agents, and background workers.
 """
 
 from shared.models.base import Base, TimestampMixin, UUIDMixin
-from shared.models.user import User, Subscription
 from shared.models.chat import ChatSession, Message
 from shared.models.cocktail import Cocktail, CocktailFeedback
-from shared.models.support import SupportTicket
 from shared.models.gamification import Quest, UserQuestProgress
+from shared.models.llm import LLMUsage, Model, PendingCocktail, UserBarContext
 from shared.models.mlops import MLExperiment, ValidationFailure
-from shared.models.llm import Model, LLMUsage, UserBarContext, PendingCocktail
+from shared.models.support import SupportTicket
+from shared.models.user import Subscription, User
 
 __all__ = [
     "Base",

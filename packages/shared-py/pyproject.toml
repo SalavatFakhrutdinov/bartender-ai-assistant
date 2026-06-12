@@ -32,6 +32,19 @@ mypy = "^1.10"
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+
+[[tool.mypy.overrides]]
+module = "shared.models.*"
+disable_error_code = ["attr-defined", "misc", "assignment"]
+
+[[tool.mypy.overrides]]
+module = "shared.nats_client.*"
+disable_error_code = ["attr-defined"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"

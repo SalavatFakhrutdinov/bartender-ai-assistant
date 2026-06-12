@@ -1,7 +1,8 @@
 """Async NATS JetStream client wrapper with typed publish/subscribe."""
 
 import json
-from typing import Any, Callable, Coroutine
+from collections.abc import Callable, Coroutine
+from typing import Any
 
 import nats
 from nats.aio.client import Client as NatsConnection
@@ -10,7 +11,7 @@ from nats.js.api import ConsumerConfig
 
 from shared.events.schemas import Event
 from shared.logging.logger import get_logger
-from shared.nats_client.streams import ALL_STREAMS, StreamConfig
+from shared.nats_client.streams import ALL_STREAMS
 
 logger = get_logger(__name__)
 
@@ -57,7 +58,7 @@ class NatsClient:
             try:
                 await self._js.add_stream(**stream.to_js_config())
                 logger.info("Created stream", stream=stream.name)
-            except nats.js.errors.StreamNameAlreadyInUseError:
+            except nats.js.errors.StreamNameAlreadyInUseError:  # type: ignore[attr-defined]
                 logger.debug("Stream already exists", stream=stream.name)
             except Exception as e:
                 logger.error("Failed to create stream", stream=stream.name, error=str(e))
@@ -72,7 +73,7 @@ class NatsClient:
         if not self._js:
             raise RuntimeError("NATS not connected. Call connect() first.")
 
-        subject = event.subject()
+        subject = event.nats_subject()
         payload = event.model_dump_json().encode()
 
         ack = await self._js.publish(subject, payload)

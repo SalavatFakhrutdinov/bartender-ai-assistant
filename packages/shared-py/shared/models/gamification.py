@@ -1,12 +1,16 @@
 """Gamification quest models."""
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import TIMESTAMPTZ
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from shared.models.base import Base, TimestampMixin, UUIDMixin
+
+if TYPE_CHECKING:
+    from shared.models.user import User
 
 
 class Quest(Base, UUIDMixin, TimestampMixin):

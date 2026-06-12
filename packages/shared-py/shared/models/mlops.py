@@ -1,8 +1,6 @@
 """MLOps and validation models."""
 
-from datetime import datetime
-
-from sqlalchemy import ForeignKey, Integer, String, Text
+from sqlalchemy import ForeignKey, Integer, String
 from sqlalchemy.dialects.postgresql import JSONB, TSTZRANGE
 from sqlalchemy.orm import Mapped, mapped_column
 

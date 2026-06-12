@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import ForeignKey, String
 from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMPTZ
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 

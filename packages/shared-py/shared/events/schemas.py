@@ -5,7 +5,7 @@ The `Event` base class provides common metadata (timestamp, correlation_id,
 event_id) that all events share.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -17,7 +17,7 @@ class EventMeta(BaseModel):
 
     event_id: str = Field(default_factory=lambda: str(uuid4()))
     correlation_id: str = Field(default_factory=lambda: str(uuid4()))
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     source: str = Field(default="unknown", description="Service or agent that emitted the event")
     version: str = Field(default="1.0", description="Schema version")
 
@@ -27,7 +27,7 @@ class Event(BaseModel):
 
     meta: EventMeta = Field(default_factory=EventMeta)
 
-    def subject(self) -> str:
+    def nats_subject(self) -> str:
         """Return the NATS subject for this event type."""
         from shared.events.subjects import EVENT_TO_SUBJECT
 

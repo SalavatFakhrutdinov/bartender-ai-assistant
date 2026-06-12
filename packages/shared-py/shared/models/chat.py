@@ -1,16 +1,14 @@
 """Chat session and message models."""
 
-from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import ForeignKey, Integer, String, Text
-from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMPTZ
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from shared.models.base import Base, TimestampMixin, UUIDMixin
 
 if TYPE_CHECKING:
-    from shared.models.llm import Model as LLMModel
     from shared.models.user import User
 
 

@@ -4,7 +4,7 @@ Provides a standardized health response format used by all services
 and consumed by the Health Monitor.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -14,7 +14,7 @@ class HealthCheck(BaseModel):
     """Health check response model."""
 
     status: str = Field(default="ok", pattern="^(ok|degraded|unhealthy)$")
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     version: str = "0.1.0"
     checks: dict[str, Any] = Field(default_factory=dict)
     uptime_seconds: float = 0.0
@@ -38,13 +38,9 @@ async def health_endpoint(
     """
     all_checks = checks or {}
     any_degraded = any(
-        v != "ok" and v != "connected" and v is not True
-        for v in all_checks.values()
+        v != "ok" and v != "connected" and v is not True for v in all_checks.values()
     )
-    any_unhealthy = any(
-        v in ("failed", "unhealthy", "error", False)
-        for v in all_checks.values()
-    )
+    any_unhealthy = any(v in ("failed", "unhealthy", "error", False) for v in all_checks.values())
 
     status = "ok"
     if any_degraded:

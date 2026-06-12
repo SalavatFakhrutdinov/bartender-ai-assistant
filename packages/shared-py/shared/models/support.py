@@ -1,7 +1,6 @@
 """Support ticket model."""
 
 from sqlalchemy import ForeignKey, String, Text
-from sqlalchemy.dialects.postgresql import TIMESTAMPTZ
 from sqlalchemy.orm import Mapped, mapped_column
 
 from shared.models.base import Base, TimestampMixin, UUIDMixin
