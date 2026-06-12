@@ -2,10 +2,10 @@
 
 import time
 
-from fastapi import Request, HTTPException, status
-from starlette.middleware.base import BaseHTTPMiddleware
-from shared.logging import get_logger
+from fastapi import HTTPException, Request, status
 from shared.config import get_settings
+from shared.logging import get_logger
+from starlette.middleware.base import BaseHTTPMiddleware
 
 logger = get_logger(__name__)
 

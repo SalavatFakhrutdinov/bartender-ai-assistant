@@ -1,6 +1,6 @@
 """Auth endpoints — Clerk webhooks and JWT utilities."""
 
-from fastapi import APIRouter, Request, HTTPException, status
+from fastapi import APIRouter, Request
 from shared.logging import get_logger
 
 router = APIRouter(prefix="/auth", tags=["auth"])

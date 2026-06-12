@@ -4,9 +4,9 @@ In Phase 0, this is a simplified implementation. Full JWKS endpoint
 caching and signature verification will be added in Phase 1.
 """
 
-from fastapi import Request, HTTPException, status
-from starlette.middleware.base import BaseHTTPMiddleware
+from fastapi import Request
 from shared.logging import get_logger
+from starlette.middleware.base import BaseHTTPMiddleware
 
 logger = get_logger(__name__)
 

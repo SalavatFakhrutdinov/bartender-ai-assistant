@@ -3,15 +3,14 @@
 import asyncio
 from logging.config import fileConfig
 
-from sqlalchemy import pool
-from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import async_engine_from_config
-
 from alembic import context
+from shared.config import get_settings
 
 # Import models so Alembic can detect them
 from shared.models import Base
-from shared.config import get_settings
+from sqlalchemy import pool
+from sqlalchemy.engine import Connection
+from sqlalchemy.ext.asyncio import async_engine_from_config
 
 settings = get_settings()
 

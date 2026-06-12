@@ -3,7 +3,6 @@
 import time
 
 from fastapi import APIRouter, Request
-
 from shared.health import health_endpoint
 from shared.logging import get_logger
 

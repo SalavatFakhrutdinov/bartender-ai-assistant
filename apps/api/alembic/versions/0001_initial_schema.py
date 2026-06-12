@@ -5,17 +5,19 @@ Revises:
 Create Date: 2026-05-24
 
 """
-from typing import Sequence, Union
 
-from alembic import op
+from collections.abc import Sequence
+
 import sqlalchemy as sa
+from alembic import op
+from pgvector.sqlalchemy import Vector
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "0001"
-down_revision: Union[str, None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -27,7 +29,12 @@ def upgrade() -> None:
     # =========================================================================
     op.create_table(
         "models",
-        sa.Column("id", postgresql.UUID(as_uuid=False), primary_key=True, server_default=sa.text("gen_random_uuid()")),
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=False),
+            primary_key=True,
+            server_default=sa.text("gen_random_uuid()"),
+        ),
         sa.Column("name", sa.String(100), nullable=False, unique=True),
         sa.Column("provider", sa.String(50), nullable=False),
         sa.Column("tier", sa.String(20), nullable=False, server_default="free"),
@@ -43,7 +50,12 @@ def upgrade() -> None:
     # =========================================================================
     op.create_table(
         "users",
-        sa.Column("id", postgresql.UUID(as_uuid=False), primary_key=True, server_default=sa.text("gen_random_uuid()")),
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=False),
+            primary_key=True,
+            server_default=sa.text("gen_random_uuid()"),
+        ),
         sa.Column("email", sa.String(255), unique=True, nullable=False),
         sa.Column("name", sa.String(255), nullable=True),
         sa.Column("clerk_id", sa.String(255), unique=True, nullable=False),
@@ -60,8 +72,18 @@ def upgrade() -> None:
     # =========================================================================
     op.create_table(
         "subscriptions",
-        sa.Column("id", postgresql.UUID(as_uuid=False), primary_key=True, server_default=sa.text("gen_random_uuid()")),
-        sa.Column("user_id", postgresql.UUID(as_uuid=False), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=False),
+            primary_key=True,
+            server_default=sa.text("gen_random_uuid()"),
+        ),
+        sa.Column(
+            "user_id",
+            postgresql.UUID(as_uuid=False),
+            sa.ForeignKey("users.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("stripe_sub_id", sa.String(255), unique=True, nullable=True),
         sa.Column("stripe_customer_id", sa.String(255), nullable=True),
         sa.Column("plan", sa.String(50), nullable=False),
@@ -78,11 +100,26 @@ def upgrade() -> None:
     # =========================================================================
     op.create_table(
         "chat_sessions",
-        sa.Column("id", postgresql.UUID(as_uuid=False), primary_key=True, server_default=sa.text("gen_random_uuid()")),
-        sa.Column("user_id", postgresql.UUID(as_uuid=False), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=False),
+            primary_key=True,
+            server_default=sa.text("gen_random_uuid()"),
+        ),
+        sa.Column(
+            "user_id",
+            postgresql.UUID(as_uuid=False),
+            sa.ForeignKey("users.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("title", sa.String(255), nullable=True),
         sa.Column("first_message", sa.Text(), nullable=True),
-        sa.Column("model_used_id", postgresql.UUID(as_uuid=False), sa.ForeignKey("models.id"), nullable=True),
+        sa.Column(
+            "model_used_id",
+            postgresql.UUID(as_uuid=False),
+            sa.ForeignKey("models.id"),
+            nullable=True,
+        ),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
     )
@@ -92,13 +129,28 @@ def upgrade() -> None:
     # =========================================================================
     op.create_table(
         "messages",
-        sa.Column("id", postgresql.UUID(as_uuid=False), primary_key=True, server_default=sa.text("gen_random_uuid()")),
-        sa.Column("session_id", postgresql.UUID(as_uuid=False), sa.ForeignKey("chat_sessions.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=False),
+            primary_key=True,
+            server_default=sa.text("gen_random_uuid()"),
+        ),
+        sa.Column(
+            "session_id",
+            postgresql.UUID(as_uuid=False),
+            sa.ForeignKey("chat_sessions.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("role", sa.String(20), nullable=False),
         sa.Column("content", sa.Text(), nullable=False),
         sa.Column("command", sa.String(50), nullable=True),
         sa.Column("command_args", postgresql.JSONB(), nullable=True),
-        sa.Column("model_used_id", postgresql.UUID(as_uuid=False), sa.ForeignKey("models.id"), nullable=True),
+        sa.Column(
+            "model_used_id",
+            postgresql.UUID(as_uuid=False),
+            sa.ForeignKey("models.id"),
+            nullable=True,
+        ),
         sa.Column("latency_ms", sa.Integer(), nullable=True),
         sa.Column("token_count_input", sa.Integer(), nullable=True),
         sa.Column("token_count_output", sa.Integer(), nullable=True),
@@ -110,7 +162,12 @@ def upgrade() -> None:
     # =========================================================================
     op.create_table(
         "cocktails",
-        sa.Column("id", postgresql.UUID(as_uuid=False), primary_key=True, server_default=sa.text("gen_random_uuid()")),
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=False),
+            primary_key=True,
+            server_default=sa.text("gen_random_uuid()"),
+        ),
         sa.Column("name", sa.String(255), nullable=False),
         sa.Column("description", sa.Text(), nullable=True),
         sa.Column("ingredients", postgresql.JSONB(), nullable=False),
@@ -119,7 +176,9 @@ def upgrade() -> None:
         sa.Column("garnish", sa.String(255), nullable=True),
         sa.Column("tasting_notes", postgresql.JSONB(), nullable=True),
         sa.Column("source", sa.String(50), nullable=False, server_default="generated"),
-        sa.Column("created_by", postgresql.UUID(as_uuid=False), sa.ForeignKey("users.id"), nullable=True),
+        sa.Column(
+            "created_by", postgresql.UUID(as_uuid=False), sa.ForeignKey("users.id"), nullable=True
+        ),
         sa.Column("taste_score", sa.Numeric(3, 2), nullable=True),
         sa.Column("feedback_count", sa.Integer(), default=0),
         sa.Column("is_deprecated", sa.Boolean(), default=False),
@@ -127,7 +186,12 @@ def upgrade() -> None:
         sa.Column("physical_validation_status", sa.String(20), nullable=True),
         sa.Column("qdrant_point_id", sa.String(255), nullable=True),
         sa.Column("neo4j_node_id", sa.String(255), nullable=True),
-        sa.Column("model_used_id", postgresql.UUID(as_uuid=False), sa.ForeignKey("models.id"), nullable=True),
+        sa.Column(
+            "model_used_id",
+            postgresql.UUID(as_uuid=False),
+            sa.ForeignKey("models.id"),
+            nullable=True,
+        ),
         sa.Column("generation_metadata", postgresql.JSONB(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
@@ -138,18 +202,55 @@ def upgrade() -> None:
     # =========================================================================
     op.create_table(
         "cocktail_feedback",
-        sa.Column("id", postgresql.UUID(as_uuid=False), primary_key=True, server_default=sa.text("gen_random_uuid()")),
-        sa.Column("cocktail_id", postgresql.UUID(as_uuid=False), sa.ForeignKey("cocktails.id"), nullable=True),
-        sa.Column("user_id", postgresql.UUID(as_uuid=False), sa.ForeignKey("users.id"), nullable=True),
-        sa.Column("overall_rating", sa.Integer(), sa.CheckConstraint("overall_rating BETWEEN 1 AND 5"), nullable=True),
-        sa.Column("balance_rating", sa.Integer(), sa.CheckConstraint("balance_rating BETWEEN 1 AND 5"), nullable=True),
-        sa.Column("aroma_rating", sa.Integer(), sa.CheckConstraint("aroma_rating BETWEEN 1 AND 5"), nullable=True),
-        sa.Column("appearance_rating", sa.Integer(), sa.CheckConstraint("appearance_rating BETWEEN 1 AND 5"), nullable=True),
-        sa.Column("guest_reaction", sa.Integer(), sa.CheckConstraint("guest_reaction BETWEEN 1 AND 5"), nullable=True),
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=False),
+            primary_key=True,
+            server_default=sa.text("gen_random_uuid()"),
+        ),
+        sa.Column(
+            "cocktail_id",
+            postgresql.UUID(as_uuid=False),
+            sa.ForeignKey("cocktails.id"),
+            nullable=True,
+        ),
+        sa.Column(
+            "user_id", postgresql.UUID(as_uuid=False), sa.ForeignKey("users.id"), nullable=True
+        ),
+        sa.Column(
+            "overall_rating",
+            sa.Integer(),
+            sa.CheckConstraint("overall_rating BETWEEN 1 AND 5"),
+            nullable=True,
+        ),
+        sa.Column(
+            "balance_rating",
+            sa.Integer(),
+            sa.CheckConstraint("balance_rating BETWEEN 1 AND 5"),
+            nullable=True,
+        ),
+        sa.Column(
+            "aroma_rating",
+            sa.Integer(),
+            sa.CheckConstraint("aroma_rating BETWEEN 1 AND 5"),
+            nullable=True,
+        ),
+        sa.Column(
+            "appearance_rating",
+            sa.Integer(),
+            sa.CheckConstraint("appearance_rating BETWEEN 1 AND 5"),
+            nullable=True,
+        ),
+        sa.Column(
+            "guest_reaction",
+            sa.Integer(),
+            sa.CheckConstraint("guest_reaction BETWEEN 1 AND 5"),
+            nullable=True,
+        ),
         sa.Column("would_repeat", sa.String(20), nullable=True),
         sa.Column("modification_note", sa.Text(), nullable=True),
         sa.Column("notes", sa.Text(), nullable=True),
-        sa.Column("embedding", postgresql.VECTOR(1536), nullable=True),
+        sa.Column("embedding", Vector(1536), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
     )
 
@@ -158,8 +259,19 @@ def upgrade() -> None:
     # =========================================================================
     op.create_table(
         "user_bar_context",
-        sa.Column("id", postgresql.UUID(as_uuid=False), primary_key=True, server_default=sa.text("gen_random_uuid()")),
-        sa.Column("user_id", postgresql.UUID(as_uuid=False), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True),
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=False),
+            primary_key=True,
+            server_default=sa.text("gen_random_uuid()"),
+        ),
+        sa.Column(
+            "user_id",
+            postgresql.UUID(as_uuid=False),
+            sa.ForeignKey("users.id", ondelete="CASCADE"),
+            nullable=False,
+            unique=True,
+        ),
         sa.Column("concept_text", sa.Text(), nullable=True),
         sa.Column("inventory", postgresql.JSONB(), nullable=True),
         sa.Column("style_preferences", postgresql.JSONB(), nullable=True),
@@ -174,10 +286,27 @@ def upgrade() -> None:
     # =========================================================================
     op.create_table(
         "llm_usage",
-        sa.Column("id", postgresql.UUID(as_uuid=False), primary_key=True, server_default=sa.text("gen_random_uuid()")),
-        sa.Column("user_id", postgresql.UUID(as_uuid=False), sa.ForeignKey("users.id"), nullable=True),
-        sa.Column("session_id", postgresql.UUID(as_uuid=False), sa.ForeignKey("chat_sessions.id"), nullable=True),
-        sa.Column("model_used_id", postgresql.UUID(as_uuid=False), sa.ForeignKey("models.id"), nullable=False),
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=False),
+            primary_key=True,
+            server_default=sa.text("gen_random_uuid()"),
+        ),
+        sa.Column(
+            "user_id", postgresql.UUID(as_uuid=False), sa.ForeignKey("users.id"), nullable=True
+        ),
+        sa.Column(
+            "session_id",
+            postgresql.UUID(as_uuid=False),
+            sa.ForeignKey("chat_sessions.id"),
+            nullable=True,
+        ),
+        sa.Column(
+            "model_used_id",
+            postgresql.UUID(as_uuid=False),
+            sa.ForeignKey("models.id"),
+            nullable=False,
+        ),
         sa.Column("tokens_input", sa.Integer(), nullable=False),
         sa.Column("tokens_output", sa.Integer(), nullable=False),
         sa.Column("cost_usd", sa.Numeric(8, 6), nullable=True),
@@ -191,8 +320,18 @@ def upgrade() -> None:
     # =========================================================================
     op.create_table(
         "validation_failures",
-        sa.Column("id", postgresql.UUID(as_uuid=False), primary_key=True, server_default=sa.text("gen_random_uuid()")),
-        sa.Column("cocktail_id", postgresql.UUID(as_uuid=False), sa.ForeignKey("cocktails.id"), nullable=True),
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=False),
+            primary_key=True,
+            server_default=sa.text("gen_random_uuid()"),
+        ),
+        sa.Column(
+            "cocktail_id",
+            postgresql.UUID(as_uuid=False),
+            sa.ForeignKey("cocktails.id"),
+            nullable=True,
+        ),
         sa.Column("recipe_json", postgresql.JSONB(), nullable=False),
         sa.Column("issues", postgresql.JSONB(), nullable=False),
         sa.Column("regeneration_attempts", sa.Integer(), default=0),
@@ -205,7 +344,12 @@ def upgrade() -> None:
     # =========================================================================
     op.create_table(
         "ml_experiments",
-        sa.Column("id", postgresql.UUID(as_uuid=False), primary_key=True, server_default=sa.text("gen_random_uuid()")),
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=False),
+            primary_key=True,
+            server_default=sa.text("gen_random_uuid()"),
+        ),
         sa.Column("experiment_name", sa.String(255), nullable=False),
         sa.Column("model_base", sa.String(100), nullable=False),
         sa.Column("training_data_period", postgresql.TSTZRANGE(), nullable=True),
@@ -223,14 +367,26 @@ def upgrade() -> None:
     # =========================================================================
     op.create_table(
         "support_tickets",
-        sa.Column("id", postgresql.UUID(as_uuid=False), primary_key=True, server_default=sa.text("gen_random_uuid()")),
-        sa.Column("user_id", postgresql.UUID(as_uuid=False), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=False),
+            primary_key=True,
+            server_default=sa.text("gen_random_uuid()"),
+        ),
+        sa.Column(
+            "user_id",
+            postgresql.UUID(as_uuid=False),
+            sa.ForeignKey("users.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
         sa.Column("category", sa.String(50), nullable=False),
         sa.Column("priority", sa.String(20), default="medium"),
         sa.Column("subject", sa.String(255), nullable=True),
         sa.Column("body", sa.Text(), nullable=False),
         sa.Column("status", sa.String(20), default="open"),
-        sa.Column("assigned_to", postgresql.UUID(as_uuid=False), sa.ForeignKey("users.id"), nullable=True),
+        sa.Column(
+            "assigned_to", postgresql.UUID(as_uuid=False), sa.ForeignKey("users.id"), nullable=True
+        ),
         sa.Column("resolution", sa.Text(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
@@ -241,7 +397,12 @@ def upgrade() -> None:
     # =========================================================================
     op.create_table(
         "quests",
-        sa.Column("id", postgresql.UUID(as_uuid=False), primary_key=True, server_default=sa.text("gen_random_uuid()")),
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=False),
+            primary_key=True,
+            server_default=sa.text("gen_random_uuid()"),
+        ),
         sa.Column("name", sa.String(255), nullable=False),
         sa.Column("description", sa.Text(), nullable=True),
         sa.Column("quest_type", sa.String(50), nullable=False),
@@ -256,9 +417,24 @@ def upgrade() -> None:
     # =========================================================================
     op.create_table(
         "user_quest_progress",
-        sa.Column("id", postgresql.UUID(as_uuid=False), primary_key=True, server_default=sa.text("gen_random_uuid()")),
-        sa.Column("user_id", postgresql.UUID(as_uuid=False), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("quest_id", postgresql.UUID(as_uuid=False), sa.ForeignKey("quests.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=False),
+            primary_key=True,
+            server_default=sa.text("gen_random_uuid()"),
+        ),
+        sa.Column(
+            "user_id",
+            postgresql.UUID(as_uuid=False),
+            sa.ForeignKey("users.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        sa.Column(
+            "quest_id",
+            postgresql.UUID(as_uuid=False),
+            sa.ForeignKey("quests.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("progress", sa.Integer(), default=0),
         sa.Column("completed", sa.Boolean(), default=False),
         sa.Column("completed_at", sa.DateTime(timezone=True), nullable=True),
@@ -270,13 +446,25 @@ def upgrade() -> None:
     # =========================================================================
     op.create_table(
         "pending_cocktails",
-        sa.Column("id", postgresql.UUID(as_uuid=False), primary_key=True, server_default=sa.text("gen_random_uuid()")),
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=False),
+            primary_key=True,
+            server_default=sa.text("gen_random_uuid()"),
+        ),
         sa.Column("raw_data", postgresql.JSONB(), nullable=False),
         sa.Column("source_url", sa.String(500), nullable=True),
         sa.Column("source_type", sa.String(50), nullable=True),
-        sa.Column("quality_rating", sa.Integer(), sa.CheckConstraint("quality_rating BETWEEN 1 AND 5"), nullable=True),
+        sa.Column(
+            "quality_rating",
+            sa.Integer(),
+            sa.CheckConstraint("quality_rating BETWEEN 1 AND 5"),
+            nullable=True,
+        ),
         sa.Column("taste_score", sa.Numeric(3, 2), nullable=True),
-        sa.Column("approved_by", postgresql.UUID(as_uuid=False), sa.ForeignKey("users.id"), nullable=True),
+        sa.Column(
+            "approved_by", postgresql.UUID(as_uuid=False), sa.ForeignKey("users.id"), nullable=True
+        ),
         sa.Column("approved_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("status", sa.String(20), default="pending"),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),

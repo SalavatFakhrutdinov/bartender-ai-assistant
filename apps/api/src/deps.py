@@ -1,17 +1,13 @@
 """Dependency injection for FastAPI."""
 
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
+from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from redis.asyncio import Redis
-from shared.config import get_settings
-from shared.models.user import User
 from shared.logging import get_logger
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-
-from src.core.config import get_api_settings
 
 logger = get_logger(__name__)
 security = HTTPBearer(auto_error=False)
@@ -38,7 +34,7 @@ async def get_redis(request: Request) -> Redis:
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(security)],
 ) -> dict:
     """Validate Clerk JWT and return user claims.
 
@@ -60,7 +56,9 @@ async def get_current_user(
     }
 
 
-async def get_effective_tier(user: dict = Depends(get_current_user)) -> str:
+async def get_effective_tier(
+    user: Annotated[dict, Depends(get_current_user)],
+) -> str:
     """Return the effective tier considering launch promotion."""
     # TODO: Query database for launch_promo_ends_at
     # For Phase 0, return tier from JWT claims

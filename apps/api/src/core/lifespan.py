@@ -4,9 +4,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from redis.asyncio import Redis
+from shared.config import get_settings
 from shared.logging import configure_logging, get_logger
 from shared.nats_client import NatsClient
-from shared.config import get_settings
 
 logger = get_logger(__name__)
 

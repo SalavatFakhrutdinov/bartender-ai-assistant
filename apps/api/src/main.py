@@ -1,17 +1,16 @@
 """FastAPI application factory for Bartender AI Assistant API."""
 
 from fastapi import FastAPI
-
-from shared.logging import configure_logging, get_logger
 from shared.config import get_settings
+from shared.logging import configure_logging, get_logger
 from shared.models.base import configure_async_session
 
 from src.core.config import get_api_settings
 from src.core.lifespan import lifespan
-from src.middleware.cors import add_cors_middleware
 from src.middleware.auth import ClerkAuthMiddleware
+from src.middleware.cors import add_cors_middleware
 from src.middleware.rate_limit import RateLimitMiddleware
-from src.routers import health, auth
+from src.routers import auth, health
 
 logger = get_logger(__name__)
 
